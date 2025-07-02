@@ -18,6 +18,8 @@ export default function DailyManager() {
   const [openDescTaskId, setOpenDescTaskId] = useState(null);
   // סטייט לעריכת תיאור משימה
   const [editDescTaskId, setEditDescTaskId] = useState(null);
+  // סטייט להעברת משימה
+  const [moveTaskState, setMoveTaskState] = useState(null);
 
   useEffect(() => {
     fetchDays();
@@ -145,6 +147,20 @@ export default function DailyManager() {
       fetchDays();
     } catch {
       setError('שגיאה במחיקת משימה');
+    }
+  };
+
+  // פונקציה להעברת משימה ליום אחר
+  const handleMoveTask = async (fromDayId, taskId, toDayId) => {
+    try {
+      await fetch(`${API_URL}/move-task`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromDayId, taskId, toDayId })
+      });
+      fetchDays();
+    } catch {
+      setError('שגיאה בהעברת משימה');
     }
   };
 
@@ -293,6 +309,35 @@ export default function DailyManager() {
                   >
                     מחק
                   </button>
+                  <button
+                    style={{ marginRight: 8, zIndex: 1 }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setMoveTaskState({ taskId: task._id, fromDayId: day._id });
+                    }}
+                  >
+                    העבר ליום
+                  </button>
+                  {moveTaskState && moveTaskState.taskId === task._id && moveTaskState.fromDayId === day._id && (
+                    <select
+                      style={{ marginRight: 8, zIndex: 10 }}
+                      onClick={e => e.stopPropagation()}
+                      onChange={async e => {
+                        const toDayId = e.target.value;
+                        if (!toDayId) return;
+                        await handleMoveTask(day._id, task._id, toDayId);
+                        setMoveTaskState(null);
+                      }}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>בחר יום</option>
+                      {days.filter(d => d._id !== day._id).map(d => (
+                        <option key={d._id} value={d._id}>
+                          {new Date(d.date).toLocaleDateString('he-IL')}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </li>
               );
             })}
