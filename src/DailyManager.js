@@ -20,6 +20,10 @@ export default function DailyManager() {
   const [editDescTaskId, setEditDescTaskId] = useState(null);
   // סטייט להעברת משימה
   const [moveTaskState, setMoveTaskState] = useState(null);
+  // סטייט לפתיחת פופאפ dvorush
+  const [openDvorushDayId, setOpenDvorushDayId] = useState(null);
+  // סטייט להדגשת משימת דבורוש שהושלמה
+  const [dvorushCongrats, setDvorushCongrats] = useState(null);
 
   useEffect(() => {
     fetchDays();
@@ -183,6 +187,23 @@ export default function DailyManager() {
     }
   };
 
+  const handleDvorushComplete = async (dayId, taskId, completed) => {
+    try {
+      await fetch(`${API_URL}/dvorush/complete`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dayId, taskId, completed })
+      });
+      if (completed) {
+        setDvorushCongrats(taskId);
+        setTimeout(() => setDvorushCongrats(null), 1200);
+      }
+      fetchDays();
+    } catch {
+      setError('שגיאה בסימון מטלה ב-dvorush');
+    }
+  };
+
   if (loading) return <div>טוען...</div>;
 
   return (
@@ -222,7 +243,7 @@ export default function DailyManager() {
         </div>
       )}
       {days.map(day => (
-        <div key={day._id} className="day-card">
+        <div key={day._id} className="day-card" style={{ position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="day-date">
               {new Date(day.date).toLocaleDateString('he-IL')}
@@ -232,10 +253,133 @@ export default function DailyManager() {
                 </span>
               )}
             </div>
-            <button style={{ fontSize: 14, padding: '4px 10px' }} onClick={() => handleEditDay(day)}>
-              ערוך תיאור יום
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* איקון לפתיחת dvorush */}
+              <button
+                title="משימות דבורש"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 20,
+                  color: '#6366f1',
+                  marginLeft: 8
+                }}
+                onClick={() => setOpenDvorushDayId(day._id)}
+              >
+                {/* אפשר להחליף לאייקון SVG אם רוצים */}
+                🐝
+              </button>
+              <button style={{ fontSize: 14, padding: '4px 10px' }} onClick={() => handleEditDay(day)}>
+                ערוך תיאור יום
+              </button>
+            </div>
           </div>
+          {/* פופאפ dvorush */}
+          {openDvorushDayId === day._id && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0, right: 0, left: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.2)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onClick={() => setOpenDvorushDayId(null)}
+            >
+              <div
+                style={{
+                  background: '#fff',
+                  borderRadius: 8,
+                  boxShadow: '0 2px 16px #0002',
+                  minWidth: 320,
+                  maxWidth: 400,
+                  padding: 24,
+                  position: 'relative'
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <button
+                  style={{
+                    position: 'absolute',
+                    top: 8, left: 8,
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 22,
+                    cursor: 'pointer',
+                    color: '#888'
+                  }}
+                  onClick={() => setOpenDvorushDayId(null)}
+                  title="סגור"
+                >×</button>
+                <h3 style={{ marginTop: 0, marginBottom: 16 }}>משימות דבורש ליום זה</h3>
+                {/* הודעת כל הכבוד */}
+                {dvorushCongrats && (
+                  <div style={{
+                    background: '#fef08a',
+                    color: '#b45309',
+                    borderRadius: 6,
+                    padding: '10px 0',
+                    marginBottom: 16,
+                    fontWeight: 700,
+                    fontSize: '1.1em',
+                    textAlign: 'center',
+                    boxShadow: '0 2px 8px #0001',
+                    animation: 'pop 30s'
+                  }}>
+                    כל הכבוד!
+                  </div>
+                )}
+                {(!day.dvorush || day.dvorush.length === 0) ? (
+                  <div style={{ color: '#888', margin: '16px 0' }}>אין משימות דבורש ליום זה</div>
+                ) : (
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {day.dvorush.map(task => (
+                      <li
+                        key={task._id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          marginBottom: 10,
+                          background: dvorushCongrats === task._id ? '#fef9c3' : undefined,
+                          borderRadius: dvorushCongrats === task._id ? 8 : undefined,
+                          transition: 'background 0.3s'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!task.completed}
+                          onChange={e => handleDvorushComplete(day._id, task._id, e.target.checked)}
+                          style={{
+                            marginLeft: 8,
+                            accentColor: dvorushCongrats === task._id ? '#facc15' : undefined,
+                            boxShadow: dvorushCongrats === task._id ? '0 0 0 2px #fde047' : undefined,
+                            transition: 'accent-color 0.3s, box-shadow 0.3s'
+                          }}
+                        />
+                        <span style={{
+                          // אין קו חוצה, במקום זה צבע חזק
+                          color: dvorushCongrats === task._id ? '#b45309' : (task.completed ? '#aaa' : '#222'),
+                          fontWeight: dvorushCongrats === task._id ? 700 : 400,
+                          fontSize: dvorushCongrats === task._id ? '1.08em' : undefined,
+                          transition: 'color 0.3s, font-weight 0.3s'
+                        }}>
+                          {task.title}
+                        </span>
+                        {task.description && (
+                          <span style={{ color: '#666', fontSize: '0.9em', marginRight: 8 }}>
+                            {task.description}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
           {editingDayId === day._id ? (
             <div style={{ margin: '12px 0' }}>
               <input
@@ -309,35 +453,6 @@ export default function DailyManager() {
                   >
                     מחק
                   </button>
-                  <button
-                    style={{ marginRight: 8, zIndex: 1 }}
-                    onClick={e => {
-                      e.stopPropagation();
-                      setMoveTaskState({ taskId: task._id, fromDayId: day._id });
-                    }}
-                  >
-                    העבר ליום
-                  </button>
-                  {moveTaskState && moveTaskState.taskId === task._id && moveTaskState.fromDayId === day._id && (
-                    <select
-                      style={{ marginRight: 8, zIndex: 10 }}
-                      onClick={e => e.stopPropagation()}
-                      onChange={async e => {
-                        const toDayId = e.target.value;
-                        if (!toDayId) return;
-                        await handleMoveTask(day._id, task._id, toDayId);
-                        setMoveTaskState(null);
-                      }}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>בחר יום</option>
-                      {days.filter(d => d._id !== day._id).map(d => (
-                        <option key={d._id} value={d._id}>
-                          {new Date(d.date).toLocaleDateString('he-IL')}
-                        </option>
-                      ))}
-                    </select>
-                  )}
                 </li>
               );
             })}
